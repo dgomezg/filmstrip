@@ -108,6 +108,8 @@ def build_vertical_strip(
     band_ratio: float = DEFAULT_TEXT_BAND_RATIO,
     font_path: str = DEFAULT_FONT_PATH,
     font_size: int = DEFAULT_FONT_SIZE,
+    emulsion: str = "GOLD",
+    iso: int | None = None,    
 ) -> Image.Image:
     # Sort images
     image_files = sorted(image_files)
@@ -184,7 +186,10 @@ def build_vertical_strip(
         cy = y + h // 2
 
         # LEFT — "KODAK GOLD"
-        left_text = make_vertical_text_scaled("KODAK GOLD", font, target_width)
+        left_label = f"KODAK {emulsion}".strip()
+        if iso is not None:
+            left_label = f"{left_label} {iso}".strip()
+        left_text = make_vertical_text_scaled(left_label, font, target_width)
         lx = (left_band_x0 + left_band_x1) // 2 - left_text.size[0] // 2
         ly = cy - left_text.size[1] // 2
         strip.paste(left_text, (lx, ly), left_text)
@@ -219,6 +224,8 @@ def build_horizontal_strip_upright(
     band_ratio: float = DEFAULT_TEXT_BAND_RATIO,
     font_path: str = DEFAULT_FONT_PATH,
     font_size: int = DEFAULT_FONT_SIZE,
+    emulsion: str = "GOLD",
+    iso: int | None = None,
 ) -> Image.Image:
     """Horizontal orientation:
 
@@ -304,7 +311,10 @@ def build_horizontal_strip_upright(
         cy = y + h // 2
 
         # LEFT — "KODAK GOLD"
-        left_text = make_vertical_text_scaled("KODAK GOLD", font, target_width)
+        left_label = f"KODAK {emulsion}".strip()
+        if iso is not None:
+            left_label = f"{left_label} {iso}".strip()
+        left_text = make_vertical_text_scaled(left_label, font, target_width)
         lx = (left_band_x0 + left_band_x1) // 2 - left_text.size[0] // 2
         ly = cy - left_text.size[1] // 2
         strip.paste(left_text, (lx, ly), left_text)
@@ -463,6 +473,10 @@ def main():
     parser.add_argument("--frame-gap", type=int, default=DEFAULT_FRAME_GAP)
     parser.add_argument("--font-path", default=DEFAULT_FONT_PATH)
     parser.add_argument("--meta", action="append", default=[], help="Add metadata: --meta key=value")
+    parser.add_argument("--emulsion", default="GOLD",
+                    help="Film emulsion name to print (e.g. GOLD, PORTRA, EKTAR)")
+    parser.add_argument("--iso", type=int, default=None,
+                    help="ISO speed to print next to the emulsion (e.g. 200)")
     parser.add_argument(
         "--export-pdf",
         action="store_true",
@@ -487,12 +501,17 @@ def main():
         sys.exit(1)
 
     meta = parse_meta(args.meta)
+    meta.setdefault("Emulsion", str(args.emulsion))
+    if args.iso is not None:
+        meta.setdefault("ISO", str(args.iso))
 
     # Common kwargs passed to the strip builders.
     # NOTE: Do not include strip_width here to avoid passing it twice in contact mode.
     common_kwargs = dict(
         frame_gap=args.frame_gap,
         font_path=args.font_path,
+        emulsion=args.emulsion,
+        iso=args.iso,
     )
 
     if args.mode == "strip":

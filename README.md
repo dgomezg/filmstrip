@@ -12,9 +12,10 @@ It supports:
 - ✅ **Strip** mode (single strip)
 - ✅ **Contact sheet** mode (multiple strips combined)
 - ✅ **Transparent side perforations**, mimicking real film
-- ✅ “KODAK GOLD” text, roll code `DvG-YYMMDD`, and frame numbering based on file names
+- ✅ “KODAK <EMULSION> [ISO]” edge text, roll code `DvG-YYMMDD`, and frame numbering based on file names
 - ✅ Additional EXIF-like metadata embedded into PNG files
 - ✅ Export as pdf  
+- ✅ Add ISO / emulsion text like classic Kodak rolls
 
 Designed for photographers and designers who want album mockups or prints with an analog look and feel.
 
@@ -205,6 +206,37 @@ python make_kodak_strip.py ./photos DvG-240713 output/strip_meta.png   --meta Au
 
 ---
 
+### ✔ ISO / emulsion edge text
+
+You can customize the classic roll-style edge text printed on the strip using:
+
+- `--emulsion` → film name (defaults to `GOLD`)
+- `--iso` → ISO speed (optional)
+
+Examples:
+
+```bash
+# Default label: "KODAK GOLD"
+python make_kodak_strip.py ./photos DvG-240713 output/strip.png
+
+# Label: "KODAK GOLD 200"
+python make_kodak_strip.py ./photos DvG-240713 output/strip_iso.png \
+  --emulsion GOLD \
+  --iso 200
+
+# Label: "KODAK PORTRA 400"
+python make_kodak_strip.py ./photos DvG-240713 output/portra_400.png \
+  --emulsion PORTRA \
+  --iso 400
+```
+
+Notes:
+- The label is printed on the **left band**, aligned with each frame.
+- When `--iso` is provided, it is appended to the emulsion name.
+- The values are also embedded as PNG metadata keys: `Emulsion` and `ISO`.
+
+---
+
 ### ✔ Other useful parameters
 
 - `--strip-width <px>` → base negative width
@@ -223,7 +255,7 @@ python make_kodak_strip.py ./photos DvG-240713 output/strip_font.png   --font-pa
 ## 🎨 Generated negative design
 
 ### Left band
-- Aligned with each photo → `KODAK GOLD`
+- Aligned with each photo → `KODAK <EMULSION> [ISO]` (e.g. `KODAK GOLD 200`)
 
 ### Right band
 - Aligned with each photo → file suffix (`0087`, `0097`, etc.)
@@ -324,5 +356,4 @@ horizontal:
 
 - Add Fuji / Portra / Ilford look presets
 - Display real EXIF data under each frame
-- Add ISO / emulsion text like classic Kodak rolls
 - Generate automatic thumbnails
