@@ -28,19 +28,20 @@ my-negative-project/
 ├─ README.md                  # This file
 │
 ├─ photos/                    # Input images folder
-│   ├─ DVG-250501-0087.jpg
-│   ├─ DVG-250501-0097.jpg
-│   ├─ DVG-250501-0098.jpg
-│   ├─ DVG-250501-0105.jpg
-│   ├─ DVG-250501-0106.jpg
-│   ├─ DVG-250501-0112.jpg
-│   ├─ DVG-250501-0115.jpg
-│   └─ DVG-250501-0347.jpg
+│   ├─ DVG-240713-0022.jpg
+│   ├─ DVG-240713-0023.jpg
+│   ├─ DVG-240713-0024.jpg
+│   ├─ DVG-240713-0025.jpg
+│   ├─ DVG-240713-0026.jpg
+│   ├─ DVG-240713-0027.jpg
+│   ├─ DVG-240713-0028.jpg
+│   ├─ DVG-240713-0029.jpg
+│   └─ ...
 │
 └─ docs/
-    ├─ tira_vertical_ejemplo.png
-    ├─ tira_horizontal_ejemplo.png
-    └─ contact_sheet_ejemplo.png
+    ├─ horizontal_strip.png
+    ├─ strip.png
+    └─ vertical_strip.png
 ```
 
 > Photos must follow the `DVG-YYMMDD-XXXX.ext` naming convention,  
@@ -52,15 +53,15 @@ my-negative-project/
 
 Vertical strip:
 
-![Vertical strip](./docs/tira_vertical_ejemplo.png)
+![Vertical strip](./output/vertical_strip.png)
 
 Horizontal strip:
 
-![Horizontal strip](./docs/tira_horizontal_ejemplo.png)
+![Horizontal strip](./output/horizontal_strip.png)
 
 Contact sheet:
 
-![Contact sheet](./docs/contact_sheet_ejemplo.png)
+![Contact sheet](./output/contact_sheet_ejemplo.png)
 
 ---
 
