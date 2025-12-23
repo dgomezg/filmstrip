@@ -5,28 +5,28 @@ from typing import List, Dict
 from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
 
 # ============================================================
-# DEFAULT CONFIGURATION
+# CONFIGURACIÓN POR DEFECTO
 # ============================================================
 
-DEFAULT_STRIP_WIDTH = 1500        # Strip width in vertical mode
-DEFAULT_STRIP_HEIGHT = 1500       # (Reserved if you want specific horizontal logic later)
-DEFAULT_FRAME_GAP = 100           # Gap between frames
-DEFAULT_HOLE_WIDTH = 70           # Perforation width
-DEFAULT_HOLE_HEIGHT = 90          # Perforation height
-DEFAULT_PERF_SPACING = 140        # Spacing between perforations
+DEFAULT_STRIP_WIDTH = 1500        # Ancho de la tira en modo vertical
+DEFAULT_STRIP_HEIGHT = 1500       # (Reservado si quieres lógica específica en horizontal)
+DEFAULT_FRAME_GAP = 100           # Separación entre fotogramas
+DEFAULT_HOLE_WIDTH = 70           # Ancho perforación
+DEFAULT_HOLE_HEIGHT = 90          # Alto perforación
+DEFAULT_PERF_SPACING = 140        # Distancia entre perforaciones
 DEFAULT_TEXT_COLOR = (255, 215, 0, 255)  # "Kodak Gold"
 DEFAULT_FONT_SIZE = 48
-DEFAULT_TEXT_BAND_RATIO = 0.4     # Percentage of the band width used by text
-DEFAULT_FRAMES_PER_STRIP = 4      # Used in contact-sheet mode
-DEFAULT_FONT_PATH = ""            # Optional path to a TTF font
+DEFAULT_TEXT_BAND_RATIO = 0.4     # % de ancho de banda que ocupa el texto
+DEFAULT_FRAMES_PER_STRIP = 4      # Usado en modo contact-sheet
+DEFAULT_FONT_PATH = ""            # Path a fuente TTF opcional
 
 
 # ============================================================
-# UTILS
+# UTILIDADES
 # ============================================================
 
 def get_resample():
-    """Returns the LANCZOS resampling filter, compatible with different Pillow versions"""
+    """Devuelve LANCZOS compatible con diferentes versiones de Pillow."""
     try:
         return Image.Resampling.LANCZOS
     except AttributeError:
@@ -34,7 +34,7 @@ def get_resample():
 
 
 def load_font(font_path: str, size: int) -> ImageFont.FreeTypeFont:
-    """Loads a TTF font or uses the default font."""
+    """Carga una fuente TTF o usa la fuente por defecto."""
     if font_path and os.path.isfile(font_path):
         try:
             return ImageFont.truetype(font_path, size)
@@ -45,8 +45,8 @@ def load_font(font_path: str, size: int) -> ImageFont.FreeTypeFont:
 
 def extract_suffix(filename: str) -> str:
     """
-    Extract the suffix from a filename.
-    Example: 'DVG-250501-0087.jpg' -> '0087'
+    Extrae el sufijo del nombre de archivo.
+    Ej: 'DVG-250501-0087.jpg' -> '0087'
     """
     base = os.path.splitext(os.path.basename(filename))[0]
     return base.split("-")[-1]
@@ -54,8 +54,8 @@ def extract_suffix(filename: str) -> str:
 
 def parse_meta(meta_list):
     """
-    Converts a 'key=value' list in a dictionary.
-    Example: ["Author=David", "Film=Kodak"] → {"Author": "David", "Film": "Kodak"}
+    Convierte una lista 'clave=valor' en un diccionario.
+    Ej: ["Author=David", "Film=Kodak"] → {"Author": "David", "Film": "Kodak"}
     """
     result = {}
     for item in meta_list:
@@ -70,9 +70,9 @@ def make_vertical_scaled(text: str,
                          target_width: int,
                          text_color=DEFAULT_TEXT_COLOR) -> Image.Image:
     """
-    Creates an image with horizontal text, rotates it 90º and rescales to target_width.
+    Crea una imagen con texto horizontal, la rota 90º y la escala a target_width.
     """
-    # temporal canvas
+    # lienzo temporal grande
     tmp = Image.new("RGBA", (2000, 400), (0, 0, 0, 0))
     d = ImageDraw.Draw(tmp)
     d.text((20, 20), text, fill=text_color, font=font)
@@ -93,7 +93,7 @@ def make_vertical_scaled(text: str,
 
 
 # ============================================================
-# VERTICAL STRIP GENERATOR
+# GENERADOR DE TIRA VERTICAL
 # ============================================================
 
 def build_vertical_strip(
@@ -109,10 +109,10 @@ def build_vertical_strip(
     font_size: int = DEFAULT_FONT_SIZE,
 ) -> Image.Image:
 
-    # Images sorting
+    # Ordenar imágenes
     image_files = sorted(image_files)
 
-    # loads images and sufixes
+    # Cargar imágenes + sufijos
     images = []
     suffixes = []
     for path in image_files:
@@ -120,11 +120,11 @@ def build_vertical_strip(
         images.append(im)
         suffixes.append(extract_suffix(path))
 
-    # Horizontal geometry
+    # Geometría horizontal
     left_margin = 40
     right_margin = 40
     strip_w = strip_width
-    band_w = hole_w  # text band width equals perforation width
+    band_w = hole_w  # la banda de texto tiene ancho igual al de las perforaciones
 
     left_hole_x0 = left_margin
     left_hole_x1 = left_hole_x0 + hole_w
@@ -138,11 +138,11 @@ def build_vertical_strip(
     right_band_x1 = right_hole_x0
     right_band_x0 = right_band_x1 - band_w
 
-    # inner width for photos:
+    # ancho interno para fotos:
     inner_w = strip_w - (left_margin + hole_w + band_w + band_w + hole_w + right_margin)
     photo_x = left_band_x1
 
-    # Resize photos to the same width
+    # Redimensionar fotos al mismo ancho
     resized = []
     heights = []
     resample = get_resample()
@@ -154,11 +154,11 @@ def build_vertical_strip(
 
     total_h = sum(heights) + frame_gap * (len(resized) + 1)
 
-    # base canvas
+    # Lienzo base
     strip = Image.new("RGBA", (strip_w, total_h), (0, 0, 0, 255))
     draw = ImageDraw.Draw(strip)
 
-    # Side perforations
+    # Perforaciones laterales
     num_holes = max(1, total_h // perf_spacing)
     for i in range(num_holes):
         cy = int(i * perf_spacing + perf_spacing / 2)
@@ -174,7 +174,7 @@ def build_vertical_strip(
             radius=15, fill=(0, 0, 0, 0)
         )
 
-    # Text
+    # Texto
     font = load_font(font_path, font_size)
     target_width = int(band_w * band_ratio)
 
@@ -183,7 +183,7 @@ def build_vertical_strip(
         h = im.size[1]
         suf = suffixes[index]
 
-        # black window frame 
+        # marco negro tipo ventanilla
         draw.rectangle(
             [photo_x - 10, y - 10, photo_x + inner_w + 10, y + h + 10],
             fill=(0, 0, 0, 255)
@@ -192,19 +192,19 @@ def build_vertical_strip(
         strip.paste(im, (photo_x, y))
         cy = y + h // 2
 
-        # LEFT — "KODAK GOLD"
+        # IZQUIERDA — "KODAK GOLD"
         left_text = make_vertical_scaled("KODAK GOLD", font, target_width)
         lx = (left_band_x0 + left_band_x1) // 2 - left_text.size[0] // 2
         ly = cy - left_text.size[1] // 2
         strip.paste(left_text, (lx, ly), left_text)
 
-        # RIGHT — Suffix (ex. 0022)
+        # DERECHA — sufijo (ej. 0087)
         right_text = make_vertical_scaled(suf, font, target_width)
         rx = (right_band_x0 + right_band_x1) // 2 - right_text.size[0] // 2
         ry = cy - right_text.size[1] // 2
         strip.paste(right_text, (rx, ry), right_text)
 
-        # BETWEEN FRAMES — roll code
+        # ENTRE FOTOGRAMAS — código de carrete
         if index < len(resized) - 1:
             gap_center = y + h + frame_gap // 2
             gap_text = make_vertical_scaled(roll_code, font, target_width)
@@ -230,15 +230,16 @@ def build_horizontal_strip_upright(
     font_size: int = DEFAULT_FONT_SIZE,
 ) -> Image.Image:
     """
-    HORIZONTAL orientation version:
-    - Photos are rotated 90° CCW before layout, then the whole strip is rotated 90° CW at the end.
-      This keeps photos upright in the final horizontal strip.
-      Text and perforations remain correctly oriented.
+    Versión para orientación HORIZONTAL:
+    - Las fotos se mantienen "derechas" para el espectador.
+    - El truco: se rotan 90º CCW antes de maquetar, y al final toda la tira se rota 90º CW.
+      Fotos: -90º + 90º = 0º (quedan sin girar).
+      Texto / perforaciones sí quedan en horizontal.
     """
 
     image_files = sorted(image_files)
 
-    # Load images and rotates them 90º CCW CCW (Pillow rotates CCW if using a positive angle)
+    # Cargar imágenes rotándolas 90º CCW (Pillow rota CCW con ángulo positivo)
     images = []
     suffixes = []
     for path in image_files:
@@ -247,7 +248,7 @@ def build_horizontal_strip_upright(
         images.append(im)
         suffixes.append(extract_suffix(path))
 
-    # Geometry (same as with horizontal)
+    # Geometría (igual que la vertical)
     left_margin = 40
     right_margin = 40
     strip_w = strip_width
@@ -268,7 +269,7 @@ def build_horizontal_strip_upright(
     inner_w = strip_w - (left_margin + hole_w + band_w + band_w + hole_w + right_margin)
     photo_x = left_band_x1
 
-    # Resize photos to the same width
+    # Redimensionar fotos al mismo ancho
     resized = []
     heights = []
     resample = get_resample()
@@ -280,11 +281,11 @@ def build_horizontal_strip_upright(
 
     total_h = sum(heights) + frame_gap * (len(resized) + 1)
 
-    # base canvas
+    # Lienzo base
     strip = Image.new("RGBA", (strip_w, total_h), (0, 0, 0, 255))
     draw = ImageDraw.Draw(strip)
 
-    # Perforations (on the sides at this stage; they will end up top/bottom after rotation)
+    # Perforaciones (laterales en esta fase; después quedarán arriba/abajo)
     num_holes = max(1, total_h // perf_spacing)
     for i in range(num_holes):
         cy = int(i * perf_spacing + perf_spacing / 2)
@@ -308,7 +309,7 @@ def build_horizontal_strip_upright(
         h = im.size[1]
         suf = suffixes[index]
 
-        # black window frame
+        # marco negro tipo ventanilla
         draw.rectangle(
             [photo_x - 10, y - 10, photo_x + inner_w + 10, y + h + 10],
             fill=(0, 0, 0, 255)
@@ -317,19 +318,19 @@ def build_horizontal_strip_upright(
         strip.paste(im, (photo_x, y))
         cy = y + h // 2
 
-        # LEFT — "KODAK GOLD"
+        # IZQUIERDA — "KODAK GOLD"
         left_text = make_vertical_scaled("KODAK GOLD", font, target_width)
         lx = (left_band_x0 + left_band_x1) // 2 - left_text.size[0] // 2
         ly = cy - left_text.size[1] // 2
         strip.paste(left_text, (lx, ly), left_text)
 
-        # RIGTH — Suffix
+        # DERECHA — sufijo
         right_text = make_vertical_scaled(suf, font, target_width)
         rx = (right_band_x0 + right_band_x1) // 2 - right_text.size[0] // 2
         ry = cy - right_text.size[1] // 2
         strip.paste(right_text, (rx, ry), right_text)
 
-        # BETWEEN FRAMES — roll_code
+        # ENTRE FOTOGRAMAS — roll_code
         if index < len(resized) - 1:
             gap_center = y + h + frame_gap // 2
             gap_text = make_vertical_scaled(roll_code, font, target_width)
@@ -339,13 +340,13 @@ def build_horizontal_strip_upright(
 
         y += h + frame_gap
 
-    # Now rotate the entire strip 90° CW so it becomes horizontal,
-    # (but the photos will be upright as they were previously rotated CCW)
+    # Ahora rotamos toda la tira 90º CW para que quede horizontal,
+    # pero las fotos neto se quedan derechas (porque antes las rotamos CCW)
     strip_horizontal = strip.rotate(-90, expand=True)
     return strip_horizontal
 
 # ============================================================
-# ORIENTATION GENERATOR (VERTICAL / HORIZONTAL)
+# GENERADOR CON ORIENTACIÓN (VERTICAL / HORIZONTAL)
 # ============================================================
 
 def build_strip_with_orientation(
@@ -355,9 +356,8 @@ def build_strip_with_orientation(
     **kwargs,
 ):
     """
-    Build a strip according to orientation:
-    - vertical   → uses build_vertical_strip (original behavior)
-    - horizontal → uses build_horizontal_strip_upright (upright photos, horizontal strip)
+    - vertical  → usa build_vertical_strip (comportamiento actual)
+    - horizontal → usa build_horizontal_strip_upright (fotos derechas, tira horizontal)
     """
     if orientation.lower() == "horizontal":
         return build_horizontal_strip_upright(
@@ -373,11 +373,11 @@ def build_strip_with_orientation(
         )
 
 # ============================================================
-# CONTACT SHEET GENERATOR (MULTIPLE STRIPS)
+# GENERADOR CONTACT SHEET (VARIAS TIRAS)
 # ============================================================
 
 def chunk_list(lst, size: int):
-    """Divides the list in blocks of the specified size."""
+    """Divide la lista en bloques de tamaño size."""
     return [lst[i:i + size] for i in range(0, len(lst), size)]
 
 
@@ -390,11 +390,9 @@ def build_contact_sheet(
     **kwargs,
 ):
     """
-    Split photos into multiple strips and assemble them into a single image.
-
-    - frames_per_strip: number of frames per strip
-    - vertical: strips placed side by side (columns)
-    - horizontal: strips stacked (rows)
+    Divide las fotos en varias tiras y las une en una imagen:
+      - vertical: tiras en columnas
+      - horizontal: tiras apiladas como filas
     """
     image_files = sorted(image_files)
     groups = chunk_list(image_files, frames_per_strip)
@@ -408,7 +406,7 @@ def build_contact_sheet(
         strips.append(strip)
 
     if not strips:
-        raise ValueError("No strip was generated.")
+        raise ValueError("No se generó ninguna tira.")
 
     if orientation.lower() == "vertical":
         # lado a lado
@@ -436,12 +434,12 @@ def build_contact_sheet(
 
 
 # ============================================================
-# METADATA PERSISTENCE
+# GUARDADO CON METADATOS
 # ============================================================
 
 def save_with_metadata(img: Image.Image, path: str, meta: Dict[str, str]):
     """
-    Saves the PNG file with tEXt metadata.
+    Guarda el PNG con metadatos tEXt.
     """
     ext = os.path.splitext(path)[1].lower()
 
@@ -459,11 +457,11 @@ def save_with_metadata(img: Image.Image, path: str, meta: Dict[str, str]):
 # ============================================================
 
 def main():
-    parser = argparse.ArgumentParser(description="Kodak Gold negative strip generator")
+    parser = argparse.ArgumentParser(description="Generador de tiras Kodak Gold")
 
-    parser.add_argument("input_dir", help="Folder containing the input images")
-    parser.add_argument("roll_code", help="Roll code (e.g. DvG-250501)")
-    parser.add_argument("output", help="Output file (PNG)")
+    parser.add_argument("input_dir", help="Carpeta con las imágenes de entrada")
+    parser.add_argument("roll_code", help="Código del carrete (ej. DvG-250501)")
+    parser.add_argument("output", help="Archivo de salida (png)")
 
     parser.add_argument("--orientation", choices=["vertical", "horizontal"], default="vertical")
     parser.add_argument("--mode", choices=["strip", "contact"], default="strip")
@@ -478,7 +476,7 @@ def main():
 
     # Buscar imágenes
     if not os.path.isdir(args.input_dir):
-        print("Folder not found:", args.input_dir)
+        print("Carpeta no encontrada:", args.input_dir)
         sys.exit(1)
 
     exts = (".jpg", ".jpeg", ".png")
@@ -489,13 +487,12 @@ def main():
     ]
 
     if not image_files:
-        print("No images were found on the source directory.")
+        print("No se encontraron imágenes.")
         sys.exit(1)
 
     meta = parse_meta(args.meta)
 
     common_kwargs = dict(
-        strip_width=args.strip_width,
         frame_gap=args.frame_gap,
         font_path=args.font_path,
     )
@@ -516,7 +513,7 @@ def main():
         )
 
     save_with_metadata(img, args.output, meta)
-    print("Strip generated at:", args.output)
+    print("Tira generada en:", args.output)
 
 
 if __name__ == "__main__":
