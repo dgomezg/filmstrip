@@ -167,7 +167,7 @@ python make_kodak_strip.py ./photos DvG-240713 contact_sheet.png   --mode contac
 You can attach metadata to the PNG:
 
 ```bash
-python make_kodak_strip.py ./photos DvG-250501 strip_meta.png   --meta Author=YourName   --meta Project=Album2025   --meta Film=KodakGold200
+python make_kodak_strip.py ./photos DvG-240713 output/strip_meta.png   --meta Author="David Gomez"   --meta Project=Stage13Tour2024   --meta Film=KodakGold200
 ```
 
 ---
@@ -182,7 +182,7 @@ python make_kodak_strip.py ./photos DvG-250501 strip_meta.png   --meta Author=Yo
 Example:
 
 ```bash
-python make_kodak_strip.py ./photos DvG-250501 strip_font.png   --font-path "/Library/Fonts/Arial.ttf"
+python make_kodak_strip.py ./photos DvG-240713 output/strip_font.png   --font-path "/Library/Fonts/Arial.ttf"
 ```
 
 ---
