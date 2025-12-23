@@ -3,7 +3,7 @@ import sys
 import argparse
 from typing import List, Dict, Tuple
 
-from PIL import Image, ImageDraw, ImageFont, PngImagePlugin
+from PIL import Image, ImageDraw, ImageFont, PngImagePlugin, ExifTags
 
 # ============================================================
 # DEFAULT CONFIGURATION
@@ -20,6 +20,10 @@ DEFAULT_FONT_SIZE = 48
 DEFAULT_TEXT_BAND_RATIO = 0.4       # % of the band width used for text
 DEFAULT_FRAMES_PER_STRIP = 4        # Used in contact-sheet mode
 DEFAULT_FONT_PATH = ""              # Optional TTF font path
+DEFAULT_EXIF_FONT_SIZE = 24
+DEFAULT_EXIF_TEXT_COLOR = (255, 215, 0, 255)
+DEFAULT_EXIF_MAX_LINES = 2
+DEFAULT_EXIF_PADDING = 8
 
 
 # ============================================================
@@ -66,6 +70,165 @@ def parse_meta(meta_list: List[str]) -> Dict[str, str]:
     return result
 
 
+# ============================================================
+# EXIF HELPERS
+# ============================================================
+
+def _exif_get(exif, key: str):
+    """Safely get an EXIF value by tag name."""
+    if not exif:
+        return None
+    try:
+        return exif.get(key)
+    except Exception:
+        return None
+
+
+def _format_exif_value(value) -> str:
+    if value is None:
+        return ""
+    # Convert rationals like (num, den) to float
+    try:
+        if isinstance(value, tuple) and len(value) == 2 and all(isinstance(x, (int, float)) for x in value):
+            num, den = value
+            if den:
+                return str(num / den)
+    except Exception:
+        pass
+    return str(value)
+
+
+def _format_exposure_time(value) -> str:
+    """Format exposure time like 1/200 when possible."""
+    if value is None:
+        return ""
+    try:
+        # Pillow may provide a Rational or fraction-like
+        if hasattr(value, 'numerator') and hasattr(value, 'denominator'):
+            num = value.numerator
+            den = value.denominator
+            if den:
+                if num == 1:
+                    return f"1/{den}"
+                return f"{num}/{den}"
+        if isinstance(value, tuple) and len(value) == 2:
+            num, den = value
+            if den:
+                if num == 1:
+                    return f"1/{den}"
+                return f"{num}/{den}"
+        # float seconds
+        v = float(value)
+        if v >= 1:
+            # 1.3s
+            return f"{v:.1f}s"
+        # 0.005 -> 1/200
+        inv = round(1 / v)
+        return f"1/{inv}"
+    except Exception:
+        return str(value)
+
+
+def format_exif_line(image_path: str) -> str:
+    """Build a compact EXIF summary line for display under the frame."""
+    try:
+        im = Image.open(image_path)
+        exif = im.getexif()
+        if not exif:
+            return ""
+
+        # Map numeric EXIF tags to readable names
+        named = {}
+        for k, v in exif.items():
+            name = ExifTags.TAGS.get(k, k)
+            named[name] = v
+
+        make = _format_exif_value(named.get("Make")).strip()
+        model = _format_exif_value(named.get("Model")).strip()
+
+        focal = named.get("FocalLength")
+        focal_s = ""
+        try:
+            if hasattr(focal, 'numerator') and hasattr(focal, 'denominator') and focal.denominator:
+                focal_s = f"{round(focal.numerator / focal.denominator)}mm"
+            elif isinstance(focal, tuple) and len(focal) == 2 and focal[1]:
+                focal_s = f"{round(focal[0] / focal[1])}mm"
+            elif focal is not None:
+                focal_s = f"{round(float(focal))}mm"
+        except Exception:
+            focal_s = ""
+
+        fnumber = named.get("FNumber")
+        f_s = ""
+        try:
+            if hasattr(fnumber, 'numerator') and hasattr(fnumber, 'denominator') and fnumber.denominator:
+                f_s = f"f/{(fnumber.numerator / fnumber.denominator):.1f}"
+            elif isinstance(fnumber, tuple) and len(fnumber) == 2 and fnumber[1]:
+                f_s = f"f/{(fnumber[0] / fnumber[1]):.1f}"
+            elif fnumber is not None:
+                f_s = f"f/{float(fnumber):.1f}"
+        except Exception:
+            f_s = ""
+
+        exposure = _format_exposure_time(named.get("ExposureTime"))
+
+        iso = named.get("ISOSpeedRatings")
+        iso_s = ""
+        if iso is not None:
+            try:
+                if isinstance(iso, (list, tuple)) and iso:
+                    iso_s = f"ISO {iso[0]}"
+                else:
+                    iso_s = f"ISO {int(iso)}"
+            except Exception:
+                iso_s = f"ISO {iso}"
+
+        # Compose camera label
+        camera = " ".join([x for x in [make, model] if x]).strip()
+
+        parts = [p for p in [camera, focal_s, f_s, exposure, iso_s] if p]
+        return " | ".join(parts)
+    except Exception:
+        return ""
+
+
+def wrap_text_lines(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_width: int, max_lines: int):
+    """Wrap text into up to max_lines so each line fits max_width."""
+    if not text:
+        return []
+
+    words = text.split()
+    lines: List[str] = []
+    current = ""
+
+    def text_width(s: str) -> int:
+        bbox = draw.textbbox((0, 0), s, font=font)
+        return bbox[2] - bbox[0]
+
+    for w in words:
+        test = (current + " " + w).strip()
+        if not current:
+            current = w
+            continue
+        if text_width(test) <= max_width:
+            current = test
+        else:
+            lines.append(current)
+            current = w
+            if len(lines) >= max_lines - 1:
+                break
+
+    if len(lines) < max_lines and current:
+        lines.append(current)
+
+    # If still too wide, hard-trim last line
+    if lines:
+        while text_width(lines[-1]) > max_width and len(lines[-1]) > 3:
+            lines[-1] = lines[-1][:-4].rstrip() + "…"
+
+    return lines[:max_lines]
+
+
 def make_vertical_text_scaled(
     text: str,
     font: ImageFont.FreeTypeFont,
@@ -109,18 +272,21 @@ def build_vertical_strip(
     font_path: str = DEFAULT_FONT_PATH,
     font_size: int = DEFAULT_FONT_SIZE,
     emulsion: str = "GOLD",
-    iso: int | None = None,    
+    iso: int | None = None,
+    exif_under_frame: bool = False,
 ) -> Image.Image:
     # Sort images
     image_files = sorted(image_files)
 
-    # Load images + suffixes
+    # Load images + suffixes + exif lines
     images: List[Image.Image] = []
     suffixes: List[str] = []
+    exif_lines: List[str] = []
     for path in image_files:
         im = Image.open(path).convert("RGB")
         images.append(im)
         suffixes.append(extract_frame_suffix(path))
+        exif_lines.append(format_exif_line(path))
 
     # Horizontal geometry
     left_margin = 40
@@ -154,7 +320,25 @@ def build_vertical_strip(
         resized.append(im.resize((inner_w, new_h), resample))
         heights.append(new_h)
 
-    total_h = sum(heights) + frame_gap * (len(resized) + 1)
+    # EXIF text height reservation (optional)
+    exif_font = load_font(font_path, DEFAULT_EXIF_FONT_SIZE)
+    dummy_draw = ImageDraw.Draw(Image.new("RGBA", (10, 10), (0, 0, 0, 0)))
+    line_bbox = dummy_draw.textbbox((0, 0), "Ag", font=exif_font)
+    line_h = (line_bbox[3] - line_bbox[1])
+
+    exif_extra_heights: List[int] = []
+    if exif_under_frame:
+        for exif_text in exif_lines:
+            if exif_text:
+                # Up to DEFAULT_EXIF_MAX_LINES lines
+                lines = wrap_text_lines(dummy_draw, exif_text, exif_font, inner_w, DEFAULT_EXIF_MAX_LINES)
+                exif_extra_heights.append(len(lines) * line_h + DEFAULT_EXIF_PADDING)
+            else:
+                exif_extra_heights.append(0)
+    else:
+        exif_extra_heights = [0] * len(resized)
+
+    total_h = sum(h + eh for h, eh in zip(heights, exif_extra_heights)) + frame_gap * (len(resized) + 1)
 
     # Base canvas
     strip = Image.new("RGBA", (strip_w, total_h), (0, 0, 0, 255))
@@ -177,10 +361,11 @@ def build_vertical_strip(
     y = frame_gap
     for index, im in enumerate(resized):
         h = im.size[1]
+        extra_h = exif_extra_heights[index] if exif_under_frame else 0
         suffix = suffixes[index]
 
-        # Black frame window
-        draw.rectangle([photo_x - 10, y - 10, photo_x + inner_w + 10, y + h + 10], fill=(0, 0, 0, 255))
+        # Black frame window (includes optional EXIF area below the photo)
+        draw.rectangle([photo_x - 10, y - 10, photo_x + inner_w + 10, y + h + extra_h + 10], fill=(0, 0, 0, 255))
 
         strip.paste(im, (photo_x, y))
         cy = y + h // 2
@@ -202,13 +387,25 @@ def build_vertical_strip(
 
         # BETWEEN FRAMES — roll code
         if index < len(resized) - 1:
-            gap_center = y + h + frame_gap // 2
+            gap_center = y + h + extra_h + frame_gap // 2
             gap_text = make_vertical_text_scaled(roll_code, font, target_width)
             gx = (right_band_x0 + right_band_x1) // 2 - gap_text.size[0] // 2
             gy = gap_center - gap_text.size[1] // 2
             strip.paste(gap_text, (gx, gy), gap_text)
 
-        y += h + frame_gap
+        # EXIF info under the frame
+        if exif_under_frame and exif_lines[index]:
+            lines = wrap_text_lines(draw, exif_lines[index], exif_font, inner_w, DEFAULT_EXIF_MAX_LINES)
+            text_y = y + h + (DEFAULT_EXIF_PADDING // 2)
+            for line in lines:
+                bbox = draw.textbbox((0, 0), line, font=exif_font)
+                line_w = bbox[2] - bbox[0]
+                line_h_local = bbox[3] - bbox[1]
+                text_x = photo_x + (inner_w // 2) - (line_w // 2)
+                draw.text((text_x, text_y), line, font=exif_font, fill=DEFAULT_EXIF_TEXT_COLOR)
+                text_y += line_h_local
+
+        y += h + extra_h + frame_gap
 
     return strip
 
@@ -226,6 +423,7 @@ def build_horizontal_strip_upright(
     font_size: int = DEFAULT_FONT_SIZE,
     emulsion: str = "GOLD",
     iso: int | None = None,
+    exif_under_frame: bool = False,
 ) -> Image.Image:
     """Horizontal orientation:
 
@@ -240,14 +438,16 @@ def build_horizontal_strip_upright(
 
     image_files = sorted(image_files)
 
-    # Load images rotated 90º CCW (positive angle in Pillow)
+    # Load images rotated 90º CCW (positive angle in Pillow) + exif lines
     images: List[Image.Image] = []
     suffixes: List[str] = []
+    exif_lines: List[str] = []
     for path in reversed(image_files):
         im = Image.open(path).convert("RGB")
         im = im.rotate(90, expand=True)  # CCW
         images.append(im)
         suffixes.append(extract_frame_suffix(path))
+        exif_lines.append(format_exif_line(path))
 
     # Geometry (same as vertical during layout)
     left_margin = 40
@@ -280,7 +480,25 @@ def build_horizontal_strip_upright(
         resized.append(im.resize((inner_w, new_h), resample))
         heights.append(new_h)
 
-    total_h = sum(heights) + frame_gap * (len(resized) + 1)
+    # EXIF text height reservation (optional)
+    exif_font = load_font(font_path, DEFAULT_EXIF_FONT_SIZE)
+    dummy_draw = ImageDraw.Draw(Image.new("RGBA", (10, 10), (0, 0, 0, 0)))
+    line_bbox = dummy_draw.textbbox((0, 0), "Ag", font=exif_font)
+    line_h = (line_bbox[3] - line_bbox[1])
+
+    exif_extra_heights: List[int] = []
+    if exif_under_frame:
+        for exif_text in exif_lines:
+            if exif_text:
+                # Up to DEFAULT_EXIF_MAX_LINES lines
+                lines = wrap_text_lines(dummy_draw, exif_text, exif_font, inner_w, DEFAULT_EXIF_MAX_LINES)
+                exif_extra_heights.append(len(lines) * line_h + DEFAULT_EXIF_PADDING)
+            else:
+                exif_extra_heights.append(0)
+    else:
+        exif_extra_heights = [0] * len(resized)
+
+    total_h = sum(h + eh for h, eh in zip(heights, exif_extra_heights)) + frame_gap * (len(resized) + 1)
 
     # Base canvas
     strip = Image.new("RGBA", (strip_w, total_h), (0, 0, 0, 255))
@@ -302,10 +520,11 @@ def build_horizontal_strip_upright(
     y = frame_gap
     for index, im in enumerate(resized):
         h = im.size[1]
+        extra_h = exif_extra_heights[index] if exif_under_frame else 0
         suffix = suffixes[index]
 
-        # Black frame window
-        draw.rectangle([photo_x - 10, y - 10, photo_x + inner_w + 10, y + h + 10], fill=(0, 0, 0, 255))
+        # Black frame window (includes optional EXIF area below the photo)
+        draw.rectangle([photo_x - 10, y - 10, photo_x + inner_w + 10, y + h + extra_h + 10], fill=(0, 0, 0, 255))
 
         strip.paste(im, (photo_x, y))
         cy = y + h // 2
@@ -327,13 +546,25 @@ def build_horizontal_strip_upright(
 
         # BETWEEN FRAMES — roll code
         if index < len(resized) - 1:
-            gap_center = y + h + frame_gap // 2
+            gap_center = y + h + extra_h + frame_gap // 2
             gap_text = make_vertical_text_scaled(roll_code, font, target_width)
             gx = (right_band_x0 + right_band_x1) // 2 - gap_text.size[0] // 2
             gy = gap_center - gap_text.size[1] // 2
             strip.paste(gap_text, (gx, gy), gap_text)
 
-        y += h + frame_gap
+        # EXIF info under the frame
+        if exif_under_frame and exif_lines[index]:
+            lines = wrap_text_lines(draw, exif_lines[index], exif_font, inner_w, DEFAULT_EXIF_MAX_LINES)
+            text_y = y + h + (DEFAULT_EXIF_PADDING // 2)
+            for line in lines:
+                bbox = draw.textbbox((0, 0), line, font=exif_font)
+                line_w = bbox[2] - bbox[0]
+                line_h_local = bbox[3] - bbox[1]
+                text_x = photo_x + (inner_w // 2) - (line_w // 2)
+                draw.text((text_x, text_y), line, font=exif_font, fill=DEFAULT_EXIF_TEXT_COLOR)
+                text_y += line_h_local
+
+        y += h + extra_h + frame_gap
 
     # Rotate the whole strip 90º CW so it becomes horizontal.
     # Photos remain upright because we rotated them 90º CCW before layout.
@@ -482,6 +713,11 @@ def main():
         action="store_true",
         help="Export an additional PDF copy next to the output image (same name, .pdf)",
     )
+    parser.add_argument(
+        "--exif-under-frame",
+        action="store_true",
+        help="Render a compact EXIF summary under each frame (camera, focal length, f-stop, shutter, ISO)",
+    )
 
     args = parser.parse_args()
 
@@ -512,6 +748,7 @@ def main():
         font_path=args.font_path,
         emulsion=args.emulsion,
         iso=args.iso,
+        exif_under_frame=args.exif_under_frame,
     )
 
     if args.mode == "strip":

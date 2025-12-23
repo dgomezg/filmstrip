@@ -16,6 +16,7 @@ It supports:
 - ✅ Additional EXIF-like metadata embedded into PNG files
 - ✅ Export as pdf  
 - ✅ Add ISO / emulsion text like classic Kodak rolls
+- ✅ Display real EXIF data under each frame
 
 Designed for photographers and designers who want album mockups or prints with an analog look and feel.
 
@@ -355,5 +356,4 @@ horizontal:
 ## 📬 Ideas for improvement
 
 - Add Fuji / Portra / Ilford look presets
-- Display real EXIF data under each frame
 - Generate automatic thumbnails
