@@ -14,6 +14,7 @@ It supports:
 - ✅ **Transparent side perforations**, mimicking real film
 - ✅ “KODAK GOLD” text, roll code `DvG-YYMMDD`, and frame numbering based on file names
 - ✅ Additional EXIF-like metadata embedded into PNG files
+- ✅ Export as pdf  
 
 Designed for photographers and designers who want album mockups or prints with an analog look and feel.
 
@@ -104,6 +105,38 @@ python make_kodak_strip.py ./photos DvG-240713 output/vertical_strip.png
 - `./photos` → folder containing images
 - `DvG-240713` → roll code printed between frames
 - `vertical_strip.png` → resulting PNG file
+
+---
+
+## 📄 Automatic PDF export
+
+The script can automatically generate a **PDF version** of the resulting strip or contact sheet.
+
+This is useful for:
+- Printing
+- Sharing a single-file document
+- Archiving finished layouts
+
+### Usage
+
+Add the `--export-pdf` flag to any command:
+
+```bash
+python make_kodak_strip.py ./photos DvG-240713 contact_sheet.png \
+  --mode contact \
+  --frames-per-strip 4 \
+  --export-pdf
+```
+
+This will generate:
+- `contact_sheet.png` (or the chosen output image format)
+- `contact_sheet.pdf` (same base name, single-page PDF)
+
+### Notes
+
+- The PDF export is **single-page**.
+- Since PDF does not support transparency in the same way as PNG, the image is flattened onto a **white background** before exporting.
+- The PDF is generated using **Pillow**, so **no additional dependencies** are required.
 
 ---
 
@@ -290,7 +323,6 @@ horizontal:
 ## 📬 Ideas for improvement
 
 - Add Fuji / Portra / Ilford look presets
-- Automatic PDF export
 - Display real EXIF data under each frame
 - Add ISO / emulsion text like classic Kodak rolls
 - Generate automatic thumbnails

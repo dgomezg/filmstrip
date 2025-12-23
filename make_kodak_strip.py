@@ -437,6 +437,7 @@ def build_contact_sheet(
 # GUARDADO CON METADATOS
 # ============================================================
 
+
 def save_with_metadata(img: Image.Image, path: str, meta: Dict[str, str]):
     """
     Guarda el PNG con metadatos tEXt.
@@ -450,6 +451,40 @@ def save_with_metadata(img: Image.Image, path: str, meta: Dict[str, str]):
         img.save(path, "PNG", pnginfo=pnginfo)
     else:
         img.save(path)
+
+
+# ================================
+# PDF/Output helpers
+# ================================
+
+def save_pdf(img: Image.Image, pdf_path: str):
+    """Save a (single-page) PDF version of the generated image.
+
+    Notes:
+    - PDF does not support alpha the same way PNG does.
+    - We flatten transparency onto a white background before exporting.
+    """
+    # Ensure we don't lose the transparent perforations in an unexpected way
+    if img.mode in ("RGBA", "LA"):
+        background = Image.new("RGB", img.size, (255, 255, 255))
+        background.paste(img, mask=img.split()[-1])
+        pdf_img = background
+    else:
+        pdf_img = img.convert("RGB")
+
+    # Pillow can write a single-page PDF directly
+    pdf_img.save(pdf_path, "PDF")
+
+
+def save_output(img: Image.Image, output_path: str, meta: Dict[str, str], export_pdf: bool):
+    """Save output as PNG/JPG/etc and optionally export a PDF copy."""
+    save_with_metadata(img, output_path, meta)
+
+    if export_pdf:
+        base, _ext = os.path.splitext(output_path)
+        pdf_path = base + ".pdf"
+        save_pdf(img, pdf_path)
+        print("PDF generado en:", pdf_path)
 
 
 # ============================================================
@@ -471,6 +506,11 @@ def main():
     parser.add_argument("--font-path", default=DEFAULT_FONT_PATH)
     parser.add_argument("--meta", action="append", default=[],
                         help="Añadir metadatos: --meta clave=valor")
+    parser.add_argument(
+        "--export-pdf",
+        action="store_true",
+        help="Export an additional PDF copy next to the output image (same name, .pdf)"
+    )
 
     args = parser.parse_args()
 
@@ -512,7 +552,7 @@ def main():
             **common_kwargs
         )
 
-    save_with_metadata(img, args.output, meta)
+    save_output(img, args.output, meta, export_pdf=args.export_pdf)
     print("Tira generada en:", args.output)
 
 
